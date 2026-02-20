@@ -83,7 +83,9 @@ var ssmParamSuffixes = []string{
 	"cloverAppId",
 	"appConfig",
 	"googleApiKey_Android",
+	"googleMapsKey",
 	"githubToken",
+	"stripePublicKey",
 }
 
 // Maps SSM param suffix → .env key name
@@ -98,7 +100,9 @@ var ssmToEnvKey = map[string]string{
 	"cloverAppId":             "CLOVER_APP_ID",
 	"appConfig":               "APP_CONFIG_VALUES",
 	"googleApiKey_Android":    "GOOGLE_API_KEY_ANDROID",
+	"googleMapsKey":           "GOOGLE_MAPS_KEY",
 	"githubToken":             "GITHUB_TOKEN",
+	"stripePublicKey":         "STRIPE_PUBLIC_KEY",
 }
 
 func refreshEnv(wsPath string, ws *workspace.Workspace) error {
@@ -178,13 +182,21 @@ func refreshEnv(wsPath string, ws *workspace.Workspace) error {
 	if v, ok := envVars["CLOVER_APP_ID"]; ok && v != "" {
 		envVars["NEXT_PUBLIC_CLOVER_APP_ID"] = v
 	}
+	if v, ok := envVars["GOOGLE_MAPS_KEY"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"] = v
+	}
+	if v, ok := envVars["STRIPE_PUBLIC_KEY"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_STRIPE_KEY"] = v
+	}
 
 	// Add static env vars
 	envVars["AWS_REGION"] = region
+	envVars["NEXT_PUBLIC_AWS_REGION"] = region
 	envVars["APP_ENV"] = env
 	if env != "" {
 		envVars["NEXT_PUBLIC_APP_ENV"] = env
 	}
+	envVars["NEXT_PUBLIC_API_DOMAIN"] = fmt.Sprintf("api-%s.sparkrewards.com", env)
 
 	// Merge workspace env vars
 	for k, v := range ws.Env {

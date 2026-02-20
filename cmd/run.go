@@ -33,6 +33,7 @@ var modelConsumers = map[string][]consumerMapping{
 	},
 	"BusinessModel": {
 		{consumer: "BusinessAPI", pkg: "@spark-rewards/srw-sdk", codegen: "typescript-ssdk-codegen"},
+		{consumer: "BusinessWebsite", pkg: "@spark-rewards/srw-client", codegen: "typescript-client-codegen"},
 	},
 }
 
