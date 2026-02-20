@@ -43,4 +43,5 @@ func Execute() {
 
 func init() {
 	rootCmd.SetVersionTemplate(fmt.Sprintf("spk %s (%s %s)\n", Version, Commit, Date))
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
