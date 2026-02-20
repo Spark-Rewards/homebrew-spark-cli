@@ -251,7 +251,7 @@ func runScript(wsPath string, ws *workspace.Workspace, repoName, script string, 
 	}
 
 	if script == "build" && !runPublished {
-		if err := autoLinkDeps(wsPath, ws, repoName); err != nil {
+		if err := autoLinkDeps(wsPath, ws, repoName, wsEnv); err != nil {
 			fmt.Printf("Warning: dependency linking issue: %v\n", err)
 		}
 	}
@@ -268,7 +268,7 @@ func runScript(wsPath string, ws *workspace.Workspace, repoName, script string, 
 	}
 
 	if script == "build" && !runPublished {
-		if err := autoLinkConsumers(wsPath, ws, repoName); err != nil {
+		if err := autoLinkConsumers(wsPath, ws, repoName, wsEnv); err != nil {
 			fmt.Printf("Note: %v\n", err)
 		}
 	}
@@ -421,7 +421,7 @@ func fileExistsRun(path string) bool {
 	return err == nil
 }
 
-func autoLinkDeps(wsPath string, ws *workspace.Workspace, name string) error {
+func autoLinkDeps(wsPath string, ws *workspace.Workspace, name string, wsEnv map[string]string) error {
 	modelName, mapping := findModelForConsumer(name)
 	if mapping == nil {
 		return nil
@@ -448,11 +448,11 @@ func autoLinkDeps(wsPath string, ws *workspace.Workspace, name string) error {
 	fmt.Printf("Linking local %s -> %s...\n", modelName, name)
 	buildDir := npm.BuildOutputDirForCodegen(modelDir, mapping.codegen)
 
-	if err := npm.Link(buildDir); err != nil {
+	if err := npm.Link(buildDir, wsEnv); err != nil {
 		return fmt.Errorf("npm link in %s failed: %w", modelName, err)
 	}
 
-	if err := npm.LinkPackage(consumerDir, mapping.pkg); err != nil {
+	if err := npm.LinkPackage(consumerDir, mapping.pkg, wsEnv); err != nil {
 		return fmt.Errorf("npm link %s failed: %w", mapping.pkg, err)
 	}
 
@@ -460,7 +460,7 @@ func autoLinkDeps(wsPath string, ws *workspace.Workspace, name string) error {
 	return nil
 }
 
-func autoLinkConsumers(wsPath string, ws *workspace.Workspace, name string) error {
+func autoLinkConsumers(wsPath string, ws *workspace.Workspace, name string, wsEnv map[string]string) error {
 	consumers, isModel := modelConsumers[name]
 	if !isModel {
 		return nil
@@ -491,12 +491,12 @@ func autoLinkConsumers(wsPath string, ws *workspace.Workspace, name string) erro
 
 		fmt.Printf("Auto-linking to consumer %s (%s)...\n", mapping.consumer, mapping.pkg)
 
-		if err := npm.Link(buildDir); err != nil {
+		if err := npm.Link(buildDir, wsEnv); err != nil {
 			fmt.Printf("Warning: npm link failed for %s: %v\n", mapping.consumer, err)
 			continue
 		}
 
-		if err := npm.LinkPackage(consumerDir, mapping.pkg); err != nil {
+		if err := npm.LinkPackage(consumerDir, mapping.pkg, wsEnv); err != nil {
 			fmt.Printf("Warning: npm link %s in %s failed: %v\n", mapping.pkg, mapping.consumer, err)
 			continue
 		}

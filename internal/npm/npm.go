@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -14,20 +15,22 @@ const (
 )
 
 // Link runs `npm link` in the given directory to register a package globally
-func Link(dir string) error {
+func Link(dir string, env map[string]string) error {
 	cmd := exec.Command("npm", "link")
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = buildEnv(env)
 	return cmd.Run()
 }
 
 // LinkPackage runs `npm link <pkg>` in the given directory to consume a linked package
-func LinkPackage(dir, pkg string) error {
+func LinkPackage(dir, pkg string, env map[string]string) error {
 	cmd := exec.Command("npm", "link", pkg)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = buildEnv(env)
 	return cmd.Run()
 }
 
@@ -114,4 +117,26 @@ func CheckNPM() error {
 		return fmt.Errorf("npm not found — install Node.js from https://nodejs.org")
 	}
 	return nil
+}
+
+// buildEnv merges extra env vars into the current process environment.
+// Returns nil (inherit process env) if extra is empty.
+func buildEnv(extra map[string]string) []string {
+	if len(extra) == 0 {
+		return nil
+	}
+	envMap := make(map[string]string)
+	for _, e := range os.Environ() {
+		if idx := strings.IndexByte(e, '='); idx != -1 {
+			envMap[e[:idx]] = e[idx+1:]
+		}
+	}
+	for k, v := range extra {
+		envMap[k] = v
+	}
+	env := make([]string, 0, len(envMap))
+	for k, v := range envMap {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	return env
 }
