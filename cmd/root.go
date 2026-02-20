@@ -16,16 +16,16 @@ Core Commands:
   create workspace <path>   Create a new workspace
   use <repo>                Add a repo to the workspace  
   sync                      Sync repos + refresh .env (auto-login)
-  build <repo>              Build with local dependency linking
-  test <repo>               Run tests
+  run build                 Build with local dependency linking
+  run test                  Run tests
 
 Quick Start:
   spk create workspace ./my-project
   cd my-project
-  spk use Spark-Rewards/AppModel
-  spk use Spark-Rewards/AppAPI
+  spk use AppModel
+  spk use AppAPI
   spk sync
-  spk build AppModel --link`,
+  cd AppAPI && spk run build`,
 }
 
 func Execute() {

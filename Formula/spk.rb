@@ -5,7 +5,7 @@
 class Spk < Formula
   desc "Workspace CLI for multi-repo development"
   homepage "https://github.com/Spark-Rewards/homebrew-spk"
-  version "0.1.4"
+  version "0.1.5"
   license "MIT"
 
   on_macos do
