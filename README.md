@@ -9,7 +9,7 @@ Multi-repo workspace CLI for Spark Rewards development.
 ## Install
 
 ```bash
-brew tap Spark-Rewards/spk
+brew tap Spark-Rewards/spark-cli
 brew install spark-cli
 ```
 
