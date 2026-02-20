@@ -45,32 +45,11 @@ const (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run <script> [args...]",
+	Use:   "run [script] [args...]",
 	Short: "Run a script in the current repo",
-	Long: `Wrapper for running scripts in the current repo. Automatically detects
-the project type and runs the appropriate command.
-
-For Node/npm projects:     spk run <script>  ->  npm run <script>
-For Gradle projects:       spk run <task>    ->  ./gradlew <task>
-For Go projects:           spk run build     ->  go build ./...
-For Make projects:         spk run <target>  ->  make <target>
-
-For 'build', automatically links locally-built dependencies (like Amazon's Brazil Build).
-Use --recursive (-r) with 'build' to build dependencies first.
-
-Examples:
-  spk run build              # npm run build / ./gradlew build
-  spk run build -r           # build dependencies first, then this repo
-  spk run test               # npm test / ./gradlew test
-  spk run start              # npm run start
-  spk run lint               # npm run lint
-  spk run clean build        # ./gradlew clean build (Gradle)`,
-	Args:               cobra.MinimumNArgs(1),
-	DisableFlagParsing: false,
+	Long:  getDynamicRunHelp(),
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		script := args[0]
-		extraArgs := args[1:]
-
 		wsPath, err := workspace.Find()
 		if err != nil {
 			return err
@@ -86,12 +65,95 @@ Examples:
 			return fmt.Errorf("must be run from inside a repo directory")
 		}
 
+		if len(args) == 0 {
+			repoDir := filepath.Join(wsPath, ws.Repos[repoName].Path)
+			projType := detectProjectType(repoDir)
+			showAvailableScripts(repoDir, projType, repoName)
+			return nil
+		}
+
+		script := args[0]
+		extraArgs := args[1:]
+
 		if script == "build" && runRecursive {
 			return buildRecursivelyRun(wsPath, ws, repoName)
 		}
 
 		return runScript(wsPath, ws, repoName, script, extraArgs)
 	},
+}
+
+func getDynamicRunHelp() string {
+	base := `Wrapper for running scripts in the current repo. Automatically detects
+the project type and runs the appropriate command.
+
+For Node/npm projects:     spk run <script>  ->  npm run <script>
+For Gradle projects:       spk run <task>    ->  ./gradlew <task>
+For Go projects:           spk run build     ->  go build ./...
+For Make projects:         spk run <target>  ->  make <target>
+
+For 'build', automatically links locally-built dependencies (like Amazon's Brazil Build).
+Use --recursive (-r) with 'build' to build dependencies first.
+
+Examples:
+  spk run                    # list available scripts
+  spk run build              # npm run build / ./gradlew build
+  spk run build -r           # build dependencies first, then this repo
+  spk run test               # npm test / ./gradlew test
+  spk run start              # npm run start
+  spk run lint               # npm run lint
+  spk run clean build        # ./gradlew clean build (Gradle)`
+
+	wsPath, err := workspace.Find()
+	if err != nil {
+		return base
+	}
+
+	ws, err := workspace.Load(wsPath)
+	if err != nil {
+		return base
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return base
+	}
+
+	var repoName string
+	var repoDir string
+	for name, repo := range ws.Repos {
+		rd := filepath.Join(wsPath, repo.Path)
+		absRepoDir, _ := filepath.Abs(rd)
+		if cwd == absRepoDir || (len(cwd) > len(absRepoDir) && strings.HasPrefix(cwd, absRepoDir+"/")) {
+			repoName = name
+			repoDir = rd
+			break
+		}
+	}
+
+	if repoName == "" {
+		return base
+	}
+
+	scripts := getNpmScripts(repoDir)
+	if scripts == nil || len(scripts) == 0 {
+		return base
+	}
+
+	var names []string
+	for name := range scripts {
+		if !strings.HasPrefix(name, "pre") && !strings.HasPrefix(name, "post") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+
+	base += fmt.Sprintf("\n\nAvailable scripts in %s:", repoName)
+	for _, name := range names {
+		base += fmt.Sprintf("\n  spk run %s", name)
+	}
+
+	return base
 }
 
 func detectCurrentRepoForRun(wsPath string, ws *workspace.Workspace) (string, error) {
