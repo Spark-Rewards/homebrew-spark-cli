@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +35,28 @@ func Status(repoDir string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// StatusLong returns full git status output (for showing unstaged changes when unable to rebase)
+func StatusLong(repoDir string) (string, error) {
+	cmd := exec.Command("git", "status")
+	cmd.Dir = repoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// StatusShortColor returns git status --short with ANSI colors (staged vs unstaged like git status)
+func StatusShortColor(repoDir string) (string, error) {
+	cmd := exec.Command("git", "status", "--short", "--color=always")
+	cmd.Dir = repoDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimRight(string(out), "\n"), nil
 }
 
 // CurrentBranch returns the current branch name
@@ -108,6 +131,33 @@ func RebaseAbort(repoDir string) error {
 	return cmd.Run()
 }
 
+// runQuiet runs a command with stdout/stderr discarded (for sync to avoid flooding output)
+func runQuiet(repoDir string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = repoDir
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	return cmd.Run()
+}
+
+// FetchQuiet runs git fetch with output suppressed
+func FetchQuiet(repoDir, remote string) error {
+	if remote == "" {
+		remote = "origin"
+	}
+	return runQuiet(repoDir, "git", "fetch", remote)
+}
+
+// RebaseQuiet runs git rebase with output suppressed
+func RebaseQuiet(repoDir, upstream string) error {
+	return runQuiet(repoDir, "git", "rebase", upstream)
+}
+
+// RebaseAbortQuiet aborts a rebase with output suppressed
+func RebaseAbortQuiet(repoDir string) error {
+	return runQuiet(repoDir, "git", "rebase", "--abort")
+}
+
 // Stash stashes uncommitted changes
 func Stash(repoDir string) error {
 	cmd := exec.Command("git", "stash", "push", "-m", "spark-cli-sync-autostash")
@@ -144,6 +194,23 @@ func IsDirty(repoDir string) bool {
 		return false
 	}
 	return status != ""
+}
+
+// IsUpToDate returns true if HEAD equals origin/targetBranch (e.g. after fetch)
+func IsUpToDate(repoDir, targetBranch string) bool {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = repoDir
+	head, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	cmd = exec.Command("git", "rev-parse", "origin/"+targetBranch)
+	cmd.Dir = repoDir
+	upstream, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(head)) == strings.TrimSpace(string(upstream))
 }
 
 // GetDefaultBranch attempts to determine the default branch (main or prod)

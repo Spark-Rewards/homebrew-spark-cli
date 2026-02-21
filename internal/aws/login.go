@@ -60,6 +60,17 @@ func GetCallerIdentity(profile string) error {
 	return cmd.Run()
 }
 
+// GetCallerIdentityQuiet verifies credentials without printing output
+func GetCallerIdentityQuiet(profile string) error {
+	args := []string{"sts", "get-caller-identity"}
+	if profile != "" {
+		args = append(args, "--profile", profile)
+	}
+
+	cmd := exec.Command("aws", args...)
+	return cmd.Run()
+}
+
 // GetSSOProfiles returns a list of SSO-configured profiles from ~/.aws/config
 func GetSSOProfiles() []string {
 	configPath := filepath.Join(os.Getenv("HOME"), ".aws", "config")

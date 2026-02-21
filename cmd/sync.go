@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/Spark-Rewards/homebrew-spark-cli/internal/aws"
 	"github.com/Spark-Rewards/homebrew-spark-cli/internal/git"
@@ -54,18 +56,15 @@ Examples:
 		}
 
 		if !syncNoEnv {
-			fmt.Println("\n--- Refreshing Environment ---")
-			if err := refreshEnv(wsPath, ws); err != nil {
+			if err := refreshEnvQuiet(wsPath, ws); err != nil {
 				fmt.Printf("Warning: failed to refresh .env: %v\n", err)
+			} else {
+				fmt.Println("Refreshed workspace environment")
 			}
 		}
 
-		fmt.Println("\n--- Updating Workspace Files ---")
-		if err := workspace.GenerateVSCodeWorkspace(wsPath); err != nil {
-			fmt.Printf("Warning: failed to update VS Code workspace: %v\n", err)
-		} else {
-			fmt.Printf("Updated %s\n", workspace.VSCodeWorkspacePath(wsPath))
-		}
+		// Silently update VS Code workspace
+		workspace.GenerateVSCodeWorkspace(wsPath)
 
 		return nil
 	},
@@ -210,6 +209,100 @@ func refreshEnv(wsPath string, ws *workspace.Workspace) error {
 	return nil
 }
 
+// refreshEnvQuiet does the same as refreshEnv but without verbose output
+func refreshEnvQuiet(wsPath string, ws *workspace.Workspace) error {
+	if err := aws.CheckCLI(); err != nil {
+		return err
+	}
+
+	profile := ws.AWSProfile
+	region := ws.AWSRegion
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	env := syncEnv
+	if env == "" && ws.SSMEnvPath != "" {
+		env = ws.SSMEnvPath
+	}
+	if env == "" {
+		env = "beta"
+	}
+
+	// Check credentials quietly, login if needed
+	if err := aws.GetCallerIdentityQuiet(profile); err != nil {
+		if err := aws.SSOLogin(profile); err != nil {
+			return fmt.Errorf("AWS login failed: %w", err)
+		}
+	}
+
+	ssmVars, err := github.FetchMultipleFromSSM(profile, env, region, ssmParamSuffixes)
+	if err != nil {
+		return fmt.Errorf("failed to fetch parameters: %w", err)
+	}
+
+	// Map SSM keys to .env keys
+	envVars := make(map[string]string)
+	for ssmKey, value := range ssmVars {
+		if envKey, ok := ssmToEnvKey[ssmKey]; ok {
+			envVars[envKey] = value
+		} else {
+			envVars[ssmKey] = value
+		}
+	}
+
+	// Business Website (Next.js) needs NEXT_PUBLIC_* from business SSM params
+	if v, ok := envVars["BUSINESS_USERPOOL_ID"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_USERPOOL_ID"] = v
+	}
+	if v, ok := envVars["BUSINESS_WEB_CLIENT_ID"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_WEB_CLIENT_ID"] = v
+	}
+	if v, ok := envVars["BUSINESS_IDENTITY_POOL_ID"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_IDENTITY_POOL_ID"] = v
+	}
+	if envVars["NEXT_PUBLIC_USERPOOL_ID"] == "" {
+		if v, ok := envVars["USERPOOL_ID"]; ok && v != "" {
+			envVars["NEXT_PUBLIC_USERPOOL_ID"] = v
+		}
+	}
+	if envVars["NEXT_PUBLIC_WEB_CLIENT_ID"] == "" {
+		if v, ok := envVars["WEB_CLIENT_ID"]; ok && v != "" {
+			envVars["NEXT_PUBLIC_WEB_CLIENT_ID"] = v
+		}
+	}
+	if envVars["NEXT_PUBLIC_IDENTITY_POOL_ID"] == "" {
+		if v, ok := envVars["IDENTITY_POOL_ID"]; ok && v != "" {
+			envVars["NEXT_PUBLIC_IDENTITY_POOL_ID"] = v
+		}
+	}
+	if v, ok := envVars["SQUARE_CLIENT_ID"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_SQUARE_CLIENT"] = v
+	}
+	if v, ok := envVars["CLOVER_APP_ID"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_CLOVER_APP_ID"] = v
+	}
+	if v, ok := envVars["GOOGLE_MAPS_KEY"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_GOOGLE_MAPS_API_KEY"] = v
+	}
+	if v, ok := envVars["STRIPE_PUBLIC_KEY"]; ok && v != "" {
+		envVars["NEXT_PUBLIC_STRIPE_KEY"] = v
+	}
+
+	envVars["AWS_REGION"] = region
+	envVars["NEXT_PUBLIC_AWS_REGION"] = region
+	envVars["APP_ENV"] = env
+	if env != "" {
+		envVars["NEXT_PUBLIC_APP_ENV"] = env
+	}
+
+	for k, v := range ws.Env {
+		envVars[k] = v
+	}
+
+	return workspace.WriteGlobalEnv(wsPath, envVars)
+}
+
 func getTargetBranch(ws *workspace.Workspace, repo *workspace.RepoDef, repoDir string) string {
 	if syncBranch != "" {
 		return syncBranch
@@ -243,30 +336,47 @@ func syncAllRepos(wsPath string, ws *workspace.Workspace) error {
 		return nil
 	}
 
-	fmt.Println("--- Syncing Repositories ---")
-	var errors []string
-	var synced int
+	// Sort repo names for consistent output
+	allNames := make([]string, 0, len(ws.Repos))
+	for name := range ws.Repos {
+		allNames = append(allNames, name)
+	}
+	sort.Strings(allNames)
 
-	for name, repo := range ws.Repos {
+	var synced int
+	for _, name := range allNames {
+		repo := ws.Repos[name]
 		repoDir := filepath.Join(wsPath, repo.Path)
+
+		// Not cloned
 		if _, err := os.Stat(repoDir); os.IsNotExist(err) {
-			fmt.Printf("[skip] %s (not cloned)\n", name)
+			fmt.Printf("[skip] %s — not cloned\n", name)
 			continue
 		}
 
+		// Has local changes — show colored status (staged/unstaged) and skip rebase
+		if git.IsDirty(repoDir) {
+			status, err := git.StatusShortColor(repoDir)
+			if err != nil || status == "" {
+				status, _ = git.Status(repoDir)
+			}
+			fmt.Printf("[skip] %s:\n", name)
+			for _, line := range strings.Split(status, "\n") {
+				if line != "" {
+					fmt.Println("       " + line)
+				}
+			}
+			// Still fetch so refs are updated
+			git.FetchQuiet(repoDir, "origin")
+			continue
+		}
+
+		// Clean — fetch and rebase
 		if err := syncRepoInternal(wsPath, ws, name, repo, repoDir); err != nil {
-			errors = append(errors, fmt.Sprintf("%s: %v", name, err))
-			fmt.Printf("[fail] %s\n", name)
+			fmt.Printf("[fail] %s — %v\n", name, err)
 		} else {
 			fmt.Printf("[ok]   %s\n", name)
 			synced++
-		}
-	}
-
-	if len(errors) > 0 {
-		fmt.Printf("\n%d repo(s) failed:\n", len(errors))
-		for _, e := range errors {
-			fmt.Printf("  - %s\n", e)
 		}
 	}
 
@@ -281,31 +391,19 @@ func syncRepoInternal(wsPath string, ws *workspace.Workspace, name string, repo 
 		return git.Pull(repoDir)
 	}
 
-	isDirty := git.IsDirty(repoDir)
-	if isDirty {
-		if err := git.Stash(repoDir); err != nil {
-			return fmt.Errorf("stash failed: %w", err)
-		}
+	// Never stash: refuse to rebase when dirty so we never touch the user's working tree on failure
+	if git.IsDirty(repoDir) {
+		return fmt.Errorf("repo has local changes — commit or stash manually before syncing")
 	}
 
-	if err := git.Fetch(repoDir, "origin"); err != nil {
-		if isDirty {
-			git.StashPop(repoDir)
-		}
+	if err := git.FetchQuiet(repoDir, "origin"); err != nil {
 		return fmt.Errorf("fetch failed: %w", err)
 	}
 
 	upstream := fmt.Sprintf("origin/%s", targetBranch)
-	if err := git.Rebase(repoDir, upstream); err != nil {
-		git.RebaseAbort(repoDir)
-		if isDirty {
-			git.StashPop(repoDir)
-		}
+	if err := git.RebaseQuiet(repoDir, upstream); err != nil {
+		git.RebaseAbortQuiet(repoDir)
 		return fmt.Errorf("rebase onto %s failed", upstream)
-	}
-
-	if isDirty {
-		git.StashPop(repoDir)
 	}
 
 	return nil
