@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +22,7 @@ var (
 	syncNoRebase bool
 	syncEnv      string
 	syncInstall  bool
+	syncUpdate   bool
 )
 
 var syncCmd = &cobra.Command{
@@ -366,6 +368,44 @@ func syncAllRepos(wsPath string, ws *workspace.Workspace) error {
 		}
 	}
 
+	if syncUpdate {
+		fmt.Println("\nUpdating @spark-rewards packages to latest...")
+		wsEnv := buildSyncEnv(wsPath, ws)
+		var updated int
+		for _, name := range allNames {
+			repo := ws.Repos[name]
+			repoDir := filepath.Join(wsPath, repo.Path)
+
+			// Skip if no package.json
+			if _, err := os.Stat(filepath.Join(repoDir, "package.json")); os.IsNotExist(err) {
+				continue
+			}
+
+			// Find @spark-rewards/* dependencies
+			pkgs := findSparkPackages(repoDir)
+			if len(pkgs) == 0 {
+				continue
+			}
+
+			// Update each package to latest
+			for _, pkg := range pkgs {
+				fmt.Printf("  %s: %s@latest...", name, pkg)
+				cmd := fmt.Sprintf("npm install %s@latest --save", pkg)
+				if err := runSyncCmd(repoDir, cmd, wsEnv); err != nil {
+					fmt.Printf(" ✗\n")
+				} else {
+					fmt.Printf(" ✓\n")
+					updated++
+				}
+			}
+		}
+		if updated > 0 {
+			fmt.Printf("%d package(s) updated across repos\n", updated)
+		} else {
+			fmt.Println("All @spark-rewards packages already up to date")
+		}
+	}
+
 	return nil
 }
 
@@ -565,6 +605,40 @@ func runSyncCmd(dir, command string, wsEnv map[string]string) error {
 	return cmd.Run()
 }
 
+// findSparkPackages reads package.json and returns all @spark-rewards/* dependency names
+func findSparkPackages(repoDir string) []string {
+	pkgPath := filepath.Join(repoDir, "package.json")
+	data, err := os.ReadFile(pkgPath)
+	if err != nil {
+		return nil
+	}
+
+	var pkg struct {
+		Dependencies    map[string]string `json:"dependencies"`
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var result []string
+	for name := range pkg.Dependencies {
+		if strings.HasPrefix(name, "@spark-rewards/") && !seen[name] {
+			seen[name] = true
+			result = append(result, name)
+		}
+	}
+	for name := range pkg.DevDependencies {
+		if strings.HasPrefix(name, "@spark-rewards/") && !seen[name] {
+			seen[name] = true
+			result = append(result, name)
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
 func ensureGitHubTokenSync(wsEnv map[string]string) map[string]string {
 	if os.Getenv("GITHUB_TOKEN") != "" {
 		return wsEnv
@@ -593,5 +667,6 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncNoRebase, "no-rebase", false, "Use git pull instead of rebase")
 	syncCmd.Flags().StringVar(&syncEnv, "env", "", "Refresh .env from this SSM environment (e.g. beta, prod)")
 	syncCmd.Flags().BoolVarP(&syncInstall, "install", "i", false, "Run npm install on repos where package-lock.json changed")
+	syncCmd.Flags().BoolVarP(&syncUpdate, "update", "u", false, "Update @spark-rewards/* packages to latest in all repos")
 	workspaceCmd.AddCommand(syncCmd)
 }
