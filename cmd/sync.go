@@ -266,6 +266,65 @@ func getTargetBranch(ws *workspace.Workspace, repo *workspace.RepoDef, repoDir s
 	return git.GetDefaultBranch(repoDir)
 }
 
+// cdkLambdaMappings defines which Lambda repo each CDK repo needs symlinked inside it.
+var cdkLambdaMappings = []struct {
+	CDK    string
+	Lambda string
+}{
+	{CDK: "InternalServiceCDK", Lambda: "InternalAPILambda"},
+	{CDK: "AppServiceCDK", Lambda: "AppAPILambda"},
+	{CDK: "BusinessServiceCDK", Lambda: "BusinessAPILambda"},
+}
+
+// linkCDKDependencies creates symlinks from each CDK repo to its sibling Lambda repo.
+// Uses relative symlinks so they work on any machine.
+func linkCDKDependencies(wsPath string) {
+	fmt.Println("\nLinking CDK dependencies...")
+	anyLinked := false
+	for _, m := range cdkLambdaMappings {
+		cdkDir := filepath.Join(wsPath, m.CDK)
+		lambdaDir := filepath.Join(wsPath, m.Lambda)
+
+		// Both repos must exist
+		if _, err := os.Stat(cdkDir); os.IsNotExist(err) {
+			continue
+		}
+		if _, err := os.Stat(lambdaDir); os.IsNotExist(err) {
+			continue
+		}
+
+		symlinkPath := filepath.Join(cdkDir, m.Lambda)
+
+		// Check if symlink already exists and is valid
+		if info, err := os.Lstat(symlinkPath); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				// Verify it resolves correctly
+				if _, err := os.Stat(symlinkPath); err == nil {
+					// Valid symlink — skip silently
+					continue
+				}
+				// Broken symlink — remove and recreate
+				os.Remove(symlinkPath)
+			} else {
+				// Something else exists there (real dir/file) — skip
+				continue
+			}
+		}
+
+		// Create relative symlink: ../Lambda from inside CDK dir
+		target := filepath.Join("..", m.Lambda)
+		if err := os.Symlink(target, symlinkPath); err != nil {
+			fmt.Printf("  ✗ %s → %s: %v\n", m.CDK, m.Lambda, err)
+		} else {
+			fmt.Printf("  🔗 %s → %s\n", m.CDK, m.Lambda)
+			anyLinked = true
+		}
+	}
+	if !anyLinked {
+		fmt.Println("  CDK dependencies already linked")
+	}
+}
+
 func syncRepo(wsPath string, ws *workspace.Workspace, name string) error {
 	repo, ok := ws.Repos[name]
 	if !ok {
@@ -282,6 +341,14 @@ func syncRepo(wsPath string, ws *workspace.Workspace, name string) error {
 
 	if syncInstall && result.lockfileChanged {
 		installRepo(wsPath, ws, name, repoDir)
+	}
+
+	// If we just synced a CDK repo, ensure its Lambda symlink is in place
+	for _, m := range cdkLambdaMappings {
+		if name == m.CDK {
+			linkCDKDependencies(wsPath)
+			break
+		}
 	}
 
 	return nil
@@ -405,6 +472,9 @@ func syncAllRepos(wsPath string, ws *workspace.Workspace) error {
 			fmt.Println("All @spark-rewards packages already up to date")
 		}
 	}
+
+	// Phase 5: link CDK dependencies
+	linkCDKDependencies(wsPath)
 
 	return nil
 }
