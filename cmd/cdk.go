@@ -5,12 +5,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/Spark-Rewards/homebrew-spark-cli/internal/workspace"
 	"github.com/spf13/cobra"
 )
 
 const cdkConfigFile = "cdk.json"
+
+// profileMap maps short profile names to AWS CLI profile names.
+var profileMap = map[string]string{
+	"pipeline": "openclaw-pipeline",
+	"beta":     "openclaw-beta",
+	"prod":     "openclaw-prod",
+}
 
 var cdkCmd = &cobra.Command{
 	Use:   "cdk [cdk-args...]",
@@ -19,14 +27,45 @@ var cdkCmd = &cobra.Command{
 from the current repo (if it contains cdk.json) or from CorePipeline (or any
 workspace repo that contains cdk.json). Passes all arguments through to cdk.
 
+A --profile / -p flag is available to select an AWS account:
+  pipeline  →  AWS_PROFILE=openclaw-pipeline
+  beta      →  AWS_PROFILE=openclaw-beta
+  prod      →  AWS_PROFILE=openclaw-prod
+
+AWS_DEFAULT_OUTPUT=json is always injected. Workspace env (GITHUB_TOKEN etc.)
+is also injected so cdk synth can resolve private npm packages.
+
 Examples:
   spark-cli cdk list
-  spark-cli cdk deploy PipelineStack/beta/SomeStack
+  spark-cli cdk --profile pipeline list
+  spark-cli cdk -p beta deploy PipelineStack/beta/SomeStack
   spark-cli cdk diff
   spark-cli cdk synth`,
-	Args:            cobra.ArbitraryArgs,
+	Args:               cobra.ArbitraryArgs,
 	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// --- Parse --profile / -p from args manually (before forwarding to cdk) ---
+		profileShort := ""
+		var cdkArgs []string
+
+		for i := 0; i < len(args); i++ {
+			arg := args[i]
+			switch {
+			case arg == "--profile" || arg == "-p":
+				if i+1 < len(args) {
+					profileShort = args[i+1]
+					i++ // skip value
+				}
+			case strings.HasPrefix(arg, "--profile="):
+				profileShort = strings.TrimPrefix(arg, "--profile=")
+			case strings.HasPrefix(arg, "-p="):
+				profileShort = strings.TrimPrefix(arg, "-p=")
+			default:
+				cdkArgs = append(cdkArgs, arg)
+			}
+		}
+
+		// --- Load workspace ---
 		wsPath, err := workspace.Find()
 		if err != nil {
 			return err
@@ -37,6 +76,28 @@ Examples:
 			return err
 		}
 
+		// --- Resolve AWS profile ---
+		awsProfileEnvVal := ""
+
+		if profileShort != "" {
+			mapped, ok := profileMap[profileShort]
+			if !ok {
+				return fmt.Errorf("unknown profile %q — valid options: pipeline, beta, prod", profileShort)
+			}
+			awsProfileEnvVal = mapped
+		} else if ws.AWSProfile != "" {
+			// Fall back to workspace default
+			awsProfileEnvVal = ws.AWSProfile
+		}
+
+		if awsProfileEnvVal != "" {
+			fmt.Printf("Using AWS profile: %s\n", awsProfileEnvVal)
+			if profileShort == "prod" {
+				fmt.Println("⚠️  Using PROD profile — be careful!")
+			}
+		}
+
+		// --- Find CDK repo dir ---
 		cdkDir, err := findCDKRepoDir(wsPath, ws)
 		if err != nil {
 			return err
@@ -47,12 +108,41 @@ Examples:
 			return fmt.Errorf("cdk not found in PATH — install with: npm install -g aws-cdk")
 		}
 
-		c := exec.Command(cdkPath, args...)
+		// --- Build env ---
+		// Start from current os env
+		envMap := make(map[string]string)
+		for _, e := range os.Environ() {
+			if idx := strings.IndexByte(e, '='); idx != -1 {
+				envMap[e[:idx]] = e[idx+1:]
+			}
+		}
+
+		// Overlay workspace env (GITHUB_TOKEN, .env, workspace.json env)
+		wsEnv := buildWorkspaceEnv(wsPath, ws)
+		for k, v := range wsEnv {
+			envMap[k] = v
+		}
+
+		// Always inject AWS_DEFAULT_OUTPUT=json (uppercase JSON in config breaks CLI)
+		envMap["AWS_DEFAULT_OUTPUT"] = "json"
+
+		// Inject AWS_PROFILE if resolved
+		if awsProfileEnvVal != "" {
+			envMap["AWS_PROFILE"] = awsProfileEnvVal
+		}
+
+		// Flatten env map back to slice
+		var env []string
+		for k, v := range envMap {
+			env = append(env, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		c := exec.Command(cdkPath, cdkArgs...)
 		c.Dir = cdkDir
 		c.Stdin = os.Stdin
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
-		c.Env = os.Environ()
+		c.Env = env
 
 		if err := c.Run(); err != nil {
 			if exit, ok := err.(*exec.ExitError); ok {
