@@ -26,6 +26,20 @@ The dev shell provides a pinned, reproducible toolchain:
 Guaranteed identical on every developer machine and in CI.
 Exit the shell with Ctrl+D or 'exit'.
 
+Inside the dev shell:
+  # Run a Lambda in watch mode (hot-reload on TypeScript changes):
+  cd ~/SparkRewards/InternalAPILambda && npm run watch
+
+  # Start a website client with hot-reload:
+  cd ~/SparkRewards/InternalWebsiteClient && npm start
+  cd ~/SparkRewards/BusinessWebsite       && npm start
+
+  # Build the Smithy model (generates SDK):
+  cd ~/SparkRewards/InternalModel && ./gradlew build
+
+  # Deploy to beta (from inside dev shell):
+  spark-cli cdk --profile pipeline deploy PipelineStack/beta/InternalServiceStack
+
 Examples:
   spark-cli dev`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,10 +48,20 @@ Examples:
 			return err
 		}
 
+		// Detect which repos are cloned locally to give targeted hints
+		tips := devTips(ws)
+
 		fmt.Println("🔥 Entering SparkRewards dev shell")
 		fmt.Printf("   Workspace: %s\n", ws)
-		fmt.Println("   Provides: Node.js 22, Java 17, AWS CLI, Gradle, git")
-		fmt.Println("   Exit: Ctrl+D or 'exit'")
+		fmt.Println("   Toolchain: Node.js 22 · Java 17 · AWS CLI · Gradle · git")
+		fmt.Println("   Exit:      Ctrl+D or 'exit'")
+		if len(tips) > 0 {
+			fmt.Println()
+			fmt.Println("   Quick commands (your local repos):")
+			for _, tip := range tips {
+				fmt.Printf("     %s\n", tip)
+			}
+		}
 		fmt.Println()
 
 		c := exec.Command(nix.NixBin, "develop", "--impure")
@@ -84,6 +108,30 @@ func nixEnvWithToken() []string {
 	}
 
 	return env
+}
+
+// devTips returns contextual quick-command hints based on which repos are cloned.
+func devTips(ws string) []string {
+	type repoTip struct {
+		repo string
+		cmd  string
+	}
+	hotReload := []repoTip{
+		{"InternalWebsiteClient", "cd InternalWebsiteClient && npm start        # hot-reload website"},
+		{"BusinessWebsite", "cd BusinessWebsite       && npm start        # hot-reload website"},
+		{"InternalAPILambda", "cd InternalAPILambda     && npm run watch     # TypeScript watch mode"},
+		{"BusinessAPILambda", "cd BusinessAPILambda     && npm run watch     # TypeScript watch mode"},
+		{"AppAPILambda", "cd AppAPILambda          && npm run watch     # TypeScript watch mode"},
+		{"InternalModel", "cd InternalModel         && ./gradlew build   # build Smithy SDK"},
+	}
+
+	var tips []string
+	for _, t := range hotReload {
+		if isGitDir(ws + "/" + t.repo) {
+			tips = append(tips, t.cmd)
+		}
+	}
+	return tips
 }
 
 func init() {
