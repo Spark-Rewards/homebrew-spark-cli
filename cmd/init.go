@@ -158,6 +158,26 @@ Examples:
 			fmt.Println("  ✓  Nix flakes already enabled")
 		}
 
+		// Clone all repos
+		fmt.Println()
+		fmt.Println("  Cloning repos...")
+		for _, repo := range nix.TrackedRepos {
+			repoPath := filepath.Join(wsPath, repo)
+			if _, err := os.Stat(filepath.Join(repoPath, ".git")); err == nil {
+				fmt.Printf("  ⏭  %s (already cloned)\n", repo)
+				continue
+			}
+			cloneURL := fmt.Sprintf("https://github.com/Spark-Rewards/%s.git", repo)
+			cloneCmd := exec.Command("git", "clone", "--depth", "1", cloneURL, repoPath)
+			cloneCmd.Stdout = nil
+			cloneCmd.Stderr = nil
+			if err := cloneCmd.Run(); err != nil {
+				fmt.Printf("  ⚠  %s (clone failed — will fetch from GitHub on build)\n", repo)
+			} else {
+				fmt.Printf("  ✓  %s\n", repo)
+			}
+		}
+
 		// Pre-warm dev shell
 		if nix.IsInstalled() {
 			fmt.Println()
@@ -172,14 +192,23 @@ Examples:
 			}
 		}
 
+		// Build
+		if nix.IsInstalled() {
+			fmt.Println()
+			fmt.Println("  Building all packages...")
+			if err := nix.Run(wsPath, "build", "--impure", ".#all", "--print-build-logs"); err != nil {
+				fmt.Println("  ⚠  Build had errors (some packages may have failed)")
+			} else {
+				fmt.Println("  ✓  All packages built")
+			}
+		}
+
 		fmt.Println()
 		fmt.Println("  ✅ Workspace ready!")
 		fmt.Println()
-		fmt.Printf("  Next steps:\n")
-		fmt.Printf("    cd %s\n", wsPath)
-		fmt.Printf("    spark-cli dev              # enter dev environment\n")
-		fmt.Printf("    spark-cli use InternalModel # clone a repo\n")
-		fmt.Printf("    spark-cli build-all         # build everything\n")
+		fmt.Printf("  cd %s\n", wsPath)
+		fmt.Printf("  spark-cli dev        # enter dev environment\n")
+		fmt.Printf("  spark-cli build-all  # rebuild after changes\n")
 
 		return nil
 	},
