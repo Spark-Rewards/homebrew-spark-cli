@@ -85,9 +85,9 @@ Examples:
 				return fmt.Errorf("unknown profile %q — valid options: pipeline, beta, prod", profileShort)
 			}
 			awsProfileEnvVal = mapped
-		} else if ws.AWSProfile != "" {
-			// Fall back to workspace default
-			awsProfileEnvVal = ws.AWSProfile
+		} else {
+			// CDK repos always need pipeline credentials by default
+			awsProfileEnvVal = "openclaw-pipeline"
 		}
 
 		if awsProfileEnvVal != "" {
@@ -191,5 +191,6 @@ func hasCDK(dir string) bool {
 }
 
 func init() {
+	cdkCmd.GroupID = "infra"
 	rootCmd.AddCommand(cdkCmd)
 }
