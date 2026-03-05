@@ -1,0 +1,220 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# SparkRewards Internal Service — AWS CodeBuild Buildspec (Nix)
+#
+# PURPOSE:
+#   Reproducible CI builds using the same Nix flake used locally.
+#   "Works on my machine" becomes "works everywhere" by design.
+#
+# USAGE:
+#   Attach this file to a CodeBuild project. Set environment:
+#     - computeType: BUILD_GENERAL1_LARGE (Nix needs ~4GB RAM for Gradle)
+#     - image: aws/codebuild/standard:7.0  (Ubuntu 22.04)
+#     - type: LINUX_CONTAINER
+#
+# PREREQUISITES (set as CodeBuild environment variables / Secrets Manager):
+#   GITHUB_TOKEN  — Personal Access Token with read:packages + repo scope
+#                   Used for: private npm registry (@spark-rewards packages)
+#                   and GitHub flake inputs (private repos)
+#   NIX_CACHE_URL — (optional) Cachix or S3 binary cache URL
+#   NIX_CACHE_KEY — (optional) Cachix auth token
+#
+# BUILD FLOW:
+#   1. Install Nix (Determinate Systems installer — fastest, most reliable)
+#   2. Configure GitHub token so Nix can fetch private flake inputs
+#   3. (Optional) Configure binary cache to skip rebuilds
+#   4. Run `nix build --impure .#all` — builds everything in dependency order
+#   5. Collect artifacts from ./result symlink
+#
+# SPARSE CHECKOUT BEHAVIOR (Brazil-like):
+#   In CI, no repos are cloned locally → all source fetched from GitHub via
+#   flake inputs (private repos need GITHUB_TOKEN in nix.conf access-tokens).
+#   This is the "full remote" mode. Developers get "local preferred" mode.
+#
+# ESTIMATED BUILD TIMES (first run, no cache):
+#   InternalModel (Gradle/Smithy):     8-15 min (downloads Maven deps)
+#   InternalAPILambda (TypeScript):    2-4 min
+#   InternalWebsiteClient (TypeScript): 2-4 min
+#   InternalServiceCDK (TypeScript):   1-2 min
+#   Total first run:                  ~15-25 min
+#   With Nix binary cache:            ~3-5 min (only changed packages rebuild)
+# ══════════════════════════════════════════════════════════════════════════════
+
+version: 0.2
+
+env:
+  variables:
+    # Nix flake requires --impure for local-path detection (filesystem reads)
+    NIX_FLAGS: "--impure"
+    # Where build artifacts land (Nix result symlink target)
+    ARTIFACT_PATH: "result"
+  secrets-manager:
+    # Set these in AWS Secrets Manager or as plaintext env vars in the project
+    GITHUB_TOKEN: "sparkrewards/github-token:token"
+    # NIX_CACHE_AUTH: "sparkrewards/cachix-token:token"  # uncomment if using Cachix
+
+phases:
+  install:
+    runtime-versions:
+      # No specific runtime needed — Nix manages everything
+      # But CodeBuild standard image includes basic tools we need for install
+      python: 3.11
+    commands:
+      - echo "=== Phase: Install Nix ==="
+
+      # Install Nix via Determinate Systems installer
+      # - Faster than official Nix installer
+      # - Works in Docker/CodeBuild (handles /nix mount correctly)
+      # - Includes flakes + nix-command enabled by default
+      - |
+        curl --proto '=https' --tlsv1.2 -sSf \
+          https://install.determinate.systems/nix \
+          | sh -s -- install linux \
+            --no-confirm \
+            --extra-conf "sandbox = false"
+        # sandbox = false: required in CodeBuild (nested namespaces not supported)
+        # For stricter builds: use a custom CodeBuild image with /nix pre-mounted
+
+      # Make nix available in PATH for this build phase
+      - source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh || true
+      - export PATH="/nix/var/nix/profiles/default/bin:$PATH"
+
+      # Verify Nix is working
+      - nix --version
+
+      # ── GitHub Token Configuration ──────────────────────────────────────────
+      # Allows Nix to fetch private GitHub repos as flake inputs.
+      # Format: access-tokens = github.com=<TOKEN>
+      - |
+        mkdir -p ~/.config/nix
+        echo "access-tokens = github.com=$GITHUB_TOKEN" >> ~/.config/nix/nix.conf
+        echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+
+      # ── (Optional) Binary Cache Setup ───────────────────────────────────────
+      # Skip rebuilds by pulling pre-built packages from Cachix or S3.
+      # Comment out this section if not using a cache yet.
+      # - |
+      #   if [ -n "$NIX_CACHE_AUTH" ]; then
+      #     nix-env -iA nixpkgs.cachix
+      #     cachix authtoken "$NIX_CACHE_AUTH"
+      #     cachix use sparkrewards-internal
+      #     echo "✓ Binary cache configured"
+      #   fi
+
+  pre_build:
+    commands:
+      - echo "=== Phase: Pre-Build ==="
+      - export PATH="/nix/var/nix/profiles/default/bin:$PATH"
+
+      # Show flake info (confirms inputs resolve correctly)
+      - nix flake metadata --impure 2>&1 | head -30
+
+      # Show what will be built
+      - echo "Packages to build:"
+      - echo "  internal-model (Gradle/Smithy → TypeScript SDK)"
+      - echo "  internal-api-lambda (TypeScript Lambda)"
+      - echo "  internal-website-client (TypeScript + Vite)"
+      - echo "  internal-service-cdk (AWS CDK)"
+
+  build:
+    commands:
+      - echo "=== Phase: Nix Build ==="
+      - export PATH="/nix/var/nix/profiles/default/bin:$PATH"
+
+      # Build all packages in dependency order.
+      # Nix resolves the graph: InternalModel must succeed before dependents build.
+      # --impure: required because flake reads filesystem for local-path detection
+      # --log-format: raw output (better for CI logs)
+      - |
+        nix build $NIX_FLAGS \
+          --log-format raw \
+          --print-build-logs \
+          .#all
+
+      - echo "=== Build complete ==="
+
+      # Show what was built
+      - |
+        echo "Build outputs:"
+        ls -la result/ 2>/dev/null || echo "(result symlink not found)"
+        echo ""
+        echo "Lambda bundle:"
+        find result/lambda/ -name "*.js" 2>/dev/null | head -10 || echo "(no lambda output)"
+        echo ""
+        echo "Frontend bundle:"
+        ls result/dist/ 2>/dev/null | head -10 || echo "(no dist output)"
+        echo ""
+        echo "SDK output:"
+        ls result/sdk/ 2>/dev/null | head -5 || echo "(no sdk output)"
+
+  post_build:
+    commands:
+      - echo "=== Phase: Post-Build ==="
+      - |
+        if [ $CODEBUILD_BUILD_SUCCEEDING -eq 1 ]; then
+          echo "✅ All packages built successfully"
+          echo ""
+          echo "Artifacts ready for:"
+          echo "  Lambda: result/lambda/ → upload to S3 / deploy via CDK"
+          echo "  Frontend: result/dist/ → upload to S3 bucket"
+          echo "  CDK: result/cdk.json → deploy with cdk deploy"
+        else
+          echo "❌ Build failed — check logs above"
+          exit 1
+        fi
+
+artifacts:
+  # Dereference symlinks so CodeBuild can actually copy the files
+  # (result/ is a symlink into /nix/store)
+  discard-paths: no
+  files:
+    # Lambda bundle for deployment
+    - result/lambda/**/*
+    # Frontend static site
+    - result/dist/**/*
+    # CDK config
+    - result/cdk.json
+    # Build metadata
+    - result/package.json
+
+  # Optional: secondary artifacts (separate S3 paths per artifact type)
+  # secondary-artifacts:
+  #   lambda-bundle:
+  #     files:
+  #       - result/lambda/**/*
+  #     base-directory: .
+  #   frontend:
+  #     files:
+  #       - result/dist/**/*
+  #     base-directory: .
+
+cache:
+  # Cache /nix/store between builds for faster rebuilds.
+  # NOTE: CodeBuild cache is per-project. For cross-project sharing, use Cachix.
+  # This saves ~5-10 min on subsequent builds by reusing unchanged derivations.
+  paths:
+    - /nix/store/**/*
+    - /root/.gradle/caches/**/*  # Gradle Maven cache (speeds up InternalModel)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NOTES FOR PRODUCTION HARDENING:
+#
+# 1. Custom Docker image (recommended):
+#    Build a CodeBuild image with Nix pre-installed + /nix pre-mounted.
+#    This eliminates the ~2 min Nix install step and makes sandbox=true possible.
+#    See: https://github.com/DeterminateSystems/nix-installer (docker variant)
+#
+# 2. Hermetic Gradle builds (recommended for InternalModel):
+#    Replace __noChroot = true with a fixed-output derivation that pre-fetches
+#    the Maven dependency cache. This makes InternalModel builds fully sandboxed.
+#    Template: use pkgs.fetchMavenArtifact or pre-populate a Maven repo tarball.
+#
+# 3. Private npm registry (for @spark-rewards packages):
+#    Currently: node_modules included from local clone (local dev) or repo (CI).
+#    Production: use buildNpmPackage with npmDepsHash + GITHUB_TOKEN via
+#    --extra-conf "netrc-file = /path/to/netrc" for hermetic npm installs.
+#
+# 4. Cachix binary cache (highly recommended):
+#    First build caches all derivations. Subsequent builds pull from cache.
+#    Setup: cachix create sparkrewards-internal && cachix push sparkrewards-internal ./result
+#    Cost: Free tier (10GB). Enterprise plans for larger caches.
+# ══════════════════════════════════════════════════════════════════════════════

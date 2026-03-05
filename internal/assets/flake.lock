@@ -1,0 +1,265 @@
+{
+  "nodes": {
+    "app-api-lambda-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772652297,
+        "narHash": "sha256-QgYLfmfRzw//0fGWNrB2RH/A6Z9pu2k54MsEQ1KUcAQ=",
+        "owner": "Spark-Rewards",
+        "repo": "AppAPILambda",
+        "rev": "c478555be8da346a4e8c4ccc04df9cf232222fa0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "AppAPILambda",
+        "type": "github"
+      }
+    },
+    "app-model-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772074939,
+        "narHash": "sha256-kNDqq7nRIw+Ta/LU19RzfDgkHOjHF1KVxkhdzcyJzYo=",
+        "owner": "Spark-Rewards",
+        "repo": "AppModel",
+        "rev": "799e7f0d850339069c83abc3b216517e10fe6fae",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "AppModel",
+        "type": "github"
+      }
+    },
+    "app-service-cdk-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772029481,
+        "narHash": "sha256-wsifUvHvYoCs4EmHvIfzIxCINiGQPRT2podAmiqWuEw=",
+        "owner": "Spark-Rewards",
+        "repo": "AppServiceCDK",
+        "rev": "5eb289f1b8eaa923536a17ecbca0a0b4ad6be03c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "AppServiceCDK",
+        "type": "github"
+      }
+    },
+    "auditor-lambda-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772599614,
+        "narHash": "sha256-+OLkDWemetUPgLnCSXVZOpQvwwDbHCPzfR627DViD5k=",
+        "owner": "Spark-Rewards",
+        "repo": "AuditorLambda",
+        "rev": "650cd0abe3450ee0fe138ad578dc63f0480d3e2d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "AuditorLambda",
+        "type": "github"
+      }
+    },
+    "business-api-lambda-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772029418,
+        "narHash": "sha256-j/71E03UL8BmntsMCyLdCrNSdMgxBBKx9RDq1vT89LM=",
+        "owner": "Spark-Rewards",
+        "repo": "BusinessAPILambda",
+        "rev": "0c1dc6af0f88688a8f0e614f17578f4a8b1ce1e1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "BusinessAPILambda",
+        "type": "github"
+      }
+    },
+    "business-model-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771811832,
+        "narHash": "sha256-zWSt5Ce0miBbQfRSXg3ucLqErJ8OgR2PuDSkiEzBHkk=",
+        "owner": "Spark-Rewards",
+        "repo": "BusinessModel",
+        "rev": "416989c81772ecf9113da465c3ee65ce9d82ff3b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "BusinessModel",
+        "type": "github"
+      }
+    },
+    "business-service-cdk-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772029501,
+        "narHash": "sha256-W1ZEyWLNmxrypreFEEXNIE74yjLrxj+/lG56ogxiZbM=",
+        "owner": "Spark-Rewards",
+        "repo": "BusinessServiceCDK",
+        "rev": "5664a47608bfd0f3e26349ec493bb51be6c17259",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "BusinessServiceCDK",
+        "type": "github"
+      }
+    },
+    "business-website-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771995691,
+        "narHash": "sha256-AQh+X4D5P5uqquhDr4gPOADKWAH0WwIcuo47b52LPCQ=",
+        "owner": "Spark-Rewards",
+        "repo": "BusinessWebsite",
+        "rev": "e047dcf510ef083ae3743cb6d4624e9308687c9e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "BusinessWebsite",
+        "type": "github"
+      }
+    },
+    "core-pipeline-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772599624,
+        "narHash": "sha256-YW+IZRnKu91Su1Ac4Ed1PfvOpKK34j1t3D0J1uuq574=",
+        "owner": "Spark-Rewards",
+        "repo": "CorePipeline",
+        "rev": "a10b90c7ea53e1fff84a89df0bca30984406376f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "CorePipeline",
+        "type": "github"
+      }
+    },
+    "internal-api-lambda-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772636432,
+        "narHash": "sha256-STpCZV0jYJcp4BMpTyDV+j93Wb9/r1VNH1wzh4/yZro=",
+        "owner": "Spark-Rewards",
+        "repo": "InternalAPILambda",
+        "rev": "4cd98656340e99098eed027ebfdd4e8ffb69d0bf",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "InternalAPILambda",
+        "type": "github"
+      }
+    },
+    "internal-model-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772070080,
+        "narHash": "sha256-R/H8T6CSIe4iKG2om7D+Rn0iLcE2uQmd4+j8AkVrnL0=",
+        "owner": "Spark-Rewards",
+        "repo": "InternalModel",
+        "rev": "4f2e5243943553a415ec21556eb614b8925a47fa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "InternalModel",
+        "type": "github"
+      }
+    },
+    "internal-service-cdk-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772635695,
+        "narHash": "sha256-e6ldw+K48tAfdzmMl6JW/SXempvS08Akd/oaoSIIqVs=",
+        "owner": "Spark-Rewards",
+        "repo": "InternalServiceCDK",
+        "rev": "871a459e94cfa55987277cbdb8b839ae070ee138",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "InternalServiceCDK",
+        "type": "github"
+      }
+    },
+    "internal-website-client-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772660709,
+        "narHash": "sha256-2zG/+lNZwiIGuWzffr45jEEGJjTrb+0m5d9iVVqemvc=",
+        "owner": "Spark-Rewards",
+        "repo": "InternalWebsiteClient",
+        "rev": "b7069e3c6a269780b8bbee60cbbc975be2473d1a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "InternalWebsiteClient",
+        "type": "github"
+      }
+    },
+    "mobile-app-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772271918,
+        "narHash": "sha256-BECEFs9PvgtKzQJWRGEaZZ0hKR+oOyghe0EuYl+PuRU=",
+        "owner": "Spark-Rewards",
+        "repo": "MobileApp",
+        "rev": "bcdf39e99f9d789642fb2e94edf85f99a92ea9cc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Spark-Rewards",
+        "repo": "MobileApp",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1772674223,
+        "narHash": "sha256-/suKbHSaSmuC9UY7G0VRQ3aO+QKqxAQPQ19wG7QNkF8=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "66d9241e3dc2296726dc522e62dbfe89c7b449f3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "app-api-lambda-src": "app-api-lambda-src",
+        "app-model-src": "app-model-src",
+        "app-service-cdk-src": "app-service-cdk-src",
+        "auditor-lambda-src": "auditor-lambda-src",
+        "business-api-lambda-src": "business-api-lambda-src",
+        "business-model-src": "business-model-src",
+        "business-service-cdk-src": "business-service-cdk-src",
+        "business-website-src": "business-website-src",
+        "core-pipeline-src": "core-pipeline-src",
+        "internal-api-lambda-src": "internal-api-lambda-src",
+        "internal-model-src": "internal-model-src",
+        "internal-service-cdk-src": "internal-service-cdk-src",
+        "internal-website-client-src": "internal-website-client-src",
+        "mobile-app-src": "mobile-app-src",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

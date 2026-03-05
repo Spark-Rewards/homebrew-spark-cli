@@ -1,0 +1,18 @@
+# Nix build output symlink
+result
+result-*
+
+# direnv local environment
+.direnv
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/settings.json
+*.swp
+*.swo
+
+# NOTE: flake.lock is intentionally NOT ignored.
+# It pins exact versions of all Nix dependencies.
+# Commit it to share reproducible builds with the team.
