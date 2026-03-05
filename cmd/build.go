@@ -143,6 +143,8 @@ func gitBranch(path string) string {
 func init() {
 	buildCmd.Flags().BoolP("verbose", "v", false, "Show raw Nix output (for debugging)")
 	buildAllCmd.Flags().BoolP("verbose", "v", false, "Show raw Nix output (for debugging)")
+	buildCmd.GroupID = "dev"
 	rootCmd.AddCommand(buildCmd)
+	buildAllCmd.GroupID = "dev"
 	rootCmd.AddCommand(buildAllCmd)
 }

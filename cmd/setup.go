@@ -24,10 +24,11 @@ Idempotent — safe to run multiple times. Skips steps already completed.
 Steps:
   1. Install Nix (Determinate Systems — fastest, most reliable)
   2. Enable Nix flakes in ~/.config/nix/nix.conf
-  3. Configure GitHub token for private repo access
+  3. Fix shell PATH so 'nix' is available after login
+  4. Configure GitHub token for private repo access
      • Auto-reads from 'gh auth token' if available
      • Writes to ~/.config/nix/nix.conf and ~/.npmrc
-  4. Pre-warm the dev shell (downloads toolchain packages)
+  5. Pre-warm the dev shell (downloads toolchain packages)
      • Node.js 22, Java 17, AWS CLI, Gradle — takes 3-10 min first time
 
 After setup:
@@ -55,10 +56,13 @@ Examples:
 		// ── Step 2: Flakes ───────────────────────────────────────────────────
 		setupStepFlakes()
 
-		// ── Step 3: GitHub token ─────────────────────────────────────────────
+		// ── Step 3: Shell PATH ───────────────────────────────────────────────
+		setupStepShellPath()
+
+		// ── Step 4: GitHub token ─────────────────────────────────────────────
 		setupStepGitHubToken()
 
-		// ── Step 4: Pre-warm devShell ────────────────────────────────────────
+		// ── Step 5: Pre-warm devShell ────────────────────────────────────────
 		setupStepPrewarm(setupSkipCache)
 
 		// ── Done ─────────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ Examples:
 // ── Step implementations ──────────────────────────────────────────────────────
 
 func setupStepNix() error {
-	printStep("1/4", "Nix installation")
+	printStep("1/5", "Nix installation")
 
 	if nix.IsInstalled() {
 		printSkip("Nix already installed — " + nix.Version())
@@ -120,7 +124,7 @@ func setupStepNix() error {
 }
 
 func setupStepFlakes() {
-	printStep("2/4", "Nix flakes")
+	printStep("2/5", "Nix flakes")
 
 	if nix.IsFlakesEnabled() {
 		printSkip("Flakes already enabled in ~/.config/nix/nix.conf")
@@ -134,8 +138,49 @@ func setupStepFlakes() {
 	printOK("experimental-features = nix-command flakes → ~/.config/nix/nix.conf")
 }
 
+// setupStepShellPath ensures the Nix daemon profile script is sourced in the
+// user's shell startup files (~/.zshrc and ~/.zprofile), so that 'nix' is on
+// PATH in every interactive and login shell without any extra manual steps.
+func setupStepShellPath() {
+	printStep("3/5", "Shell PATH (nix in PATH after login)")
+
+	nixBlock := "# Nix — added by spark-cli setup\n" +
+		"if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then\n" +
+		"    . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'\n" +
+		"fi\n"
+
+	home, _ := os.UserHomeDir()
+	patchedAny := false
+
+	for _, rc := range []string{".zshrc", ".zprofile"} {
+		path := filepath.Join(home, rc)
+		content, _ := os.ReadFile(path)
+		if strings.Contains(string(content), "nix-daemon.sh") {
+			// Already has it — leave untouched
+			continue
+		}
+
+		// Prepend the nix block so it runs before anything that might need nix
+		existing := string(content)
+		newContent := nixBlock + "\n" + existing
+		if existing == "" {
+			newContent = nixBlock
+		}
+		if err := os.WriteFile(path, []byte(newContent), 0644); err != nil {
+			printWarn("Could not write " + rc + ": " + err.Error())
+		} else {
+			printOK("nix-daemon.sh sourced in ~/" + rc)
+			patchedAny = true
+		}
+	}
+
+	if !patchedAny {
+		printSkip("nix-daemon.sh already sourced in shell profiles")
+	}
+}
+
 func setupStepGitHubToken() {
-	printStep("3/4", "GitHub token (private repos + npm packages)")
+	printStep("4/5", "GitHub token (private repos + npm packages)")
 
 	if nix.HasGitHubToken() {
 		printSkip("GitHub token already in ~/.config/nix/nix.conf")
@@ -196,7 +241,7 @@ func setupStepGitHubToken() {
 }
 
 func setupStepPrewarm(skip bool) {
-	printStep("4/4", "Pre-warming dev shell")
+	printStep("5/5", "Pre-warming dev shell")
 
 	if skip {
 		printSkip("Skipped (--skip-cache)")
@@ -233,8 +278,9 @@ func printSetupBanner() {
 	fmt.Println("  Steps:")
 	fmt.Println("  1. Install Nix (Determinate Systems)")
 	fmt.Println("  2. Enable Nix flakes")
-	fmt.Println("  3. Configure GitHub token (private repos + npm)")
-	fmt.Println("  4. Pre-warm dev environment (Node 22, Java 17, AWS CLI...)")
+	fmt.Println("  3. Fix shell PATH (nix in PATH after login)")
+	fmt.Println("  4. Configure GitHub token (private repos + npm)")
+	fmt.Println("  5. Pre-warm dev environment (Node 22, Java 17, AWS CLI...)")
 	fmt.Println()
 }
 
@@ -305,5 +351,6 @@ func ensureSparkCliInstalled() {
 func init() {
 	setupCmd.Flags().BoolVar(&setupSkipCache, "skip-cache", false,
 		"Skip pre-warming the dev shell (faster; first 'spark-cli dev' will download instead)")
+	setupCmd.GroupID = "setup"
 	rootCmd.AddCommand(setupCmd)
 }

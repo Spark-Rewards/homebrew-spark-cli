@@ -111,5 +111,6 @@ func isLocalNpmrc() bool {
 }
 
 func init() {
+	nixStatusCmd.GroupID = "dev"
 	rootCmd.AddCommand(nixStatusCmd)
 }

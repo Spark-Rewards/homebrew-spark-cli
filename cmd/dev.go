@@ -87,5 +87,6 @@ func nixEnvWithToken() []string {
 }
 
 func init() {
+	devCmd.GroupID = "dev"
 	rootCmd.AddCommand(devCmd)
 }
