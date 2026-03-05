@@ -11,7 +11,7 @@ class SparkCli < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/Spark-Rewards/homebrew-spark-cli/releases/download/v0.3.0/spark-cli_darwin_amd64.tar.gz"
-      sha256 "24ec353e19c9234f55799a25b6b17f7f4e12ead1ef5ee1ee18524065a62f606a"
+      sha256 "ba26e914e02e56d8d2eaa35e1db2a6e380eb88981132b7a11505199cadb382c1"
 
       define_method(:install) do
         bin.install "spark-cli"
@@ -19,7 +19,7 @@ class SparkCli < Formula
     end
     if Hardware::CPU.arm?
       url "https://github.com/Spark-Rewards/homebrew-spark-cli/releases/download/v0.3.0/spark-cli_darwin_arm64.tar.gz"
-      sha256 "cb7c4d7286cb9fc15b55a4a8360ba24ef94764c6ea23b25c804ec684543d1da1"
+      sha256 "d52607ef9c4f45895fa42a73a32538a8dae50f706e2637215d9297ed9cd68984"
 
       define_method(:install) do
         bin.install "spark-cli"
@@ -30,14 +30,14 @@ class SparkCli < Formula
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
       url "https://github.com/Spark-Rewards/homebrew-spark-cli/releases/download/v0.3.0/spark-cli_linux_amd64.tar.gz"
-      sha256 "6099cdd0bc869cdbfc39f3cedab999fece0f5b7b24b6e569d483a0499dd74740"
+      sha256 "60aadc9432a46758de4509624be4912dd3a0a2827ed039d22943a5e2b1f3e29c"
       define_method(:install) do
         bin.install "spark-cli"
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
       url "https://github.com/Spark-Rewards/homebrew-spark-cli/releases/download/v0.3.0/spark-cli_linux_arm64.tar.gz"
-      sha256 "2ff931573f4930127c366e35f453d7c718dba4a92efb65b193736974074944cf"
+      sha256 "b06d4c5d1d53801f362fc826d95f016c91a53ae33ff67276ab419430e60ba075"
       define_method(:install) do
         bin.install "spark-cli"
       end
