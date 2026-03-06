@@ -265,6 +265,7 @@ func orDefault(val, def string) string {
 }
 
 func init() {
+	workspaceCmd.GroupID = "workspace"
 	rootCmd.AddCommand(workspaceCmd)
 	workspaceCmd.AddCommand(workspaceCreateCmd)
 	workspaceCmd.AddCommand(workspaceConfigureCmd)

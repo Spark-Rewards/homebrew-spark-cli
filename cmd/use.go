@@ -120,5 +120,6 @@ func registerRepo(wsPath, name, remote, targetDir string) error {
 func init() {
 	useCmd.Flags().StringVar(&useBuildCmd, "build", "", "Build command for this repo (e.g., 'npm run build')")
 	useCmd.Flags().StringSliceVar(&useDeps, "deps", nil, "Dependencies (other repo names that must build first)")
+	useCmd.GroupID = "workspace"
 	rootCmd.AddCommand(useCmd)
 }

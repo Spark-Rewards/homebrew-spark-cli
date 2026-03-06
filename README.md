@@ -1,110 +1,66 @@
 # spark-cli
 
-Multi-repo workspace CLI for SparkRewards development. Includes a Brazil-like Nix build system for reproducible builds.
-
-**New to spark-cli?** See **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for a full guide.
+Multi-repo workspace CLI for SparkRewards. Reproducible Nix builds — every developer gets the same toolchain, every build produces the same output.
 
 ## Install
 
 ```bash
-brew install spark-rewards/spark-cli/spark-cli
+brew tap Spark-Rewards/spark-cli
+brew install spark-cli
 ```
 
-## Quick Start — New Developer
+## Quick Start
 
 ```bash
-# 1. Clone the workspace
 git clone git@github.com:Spark-Rewards/spark-workspace.git ~/SparkRewards
-cd ~/SparkRewards
-
-# 2. Run one-time setup
-spark-cli setup
-# → Installs Nix, configures GitHub token, pre-warms dev environment
-
-# 3. Enter the dev shell (Node 22, Java 17, AWS CLI — guaranteed consistent)
-spark-cli dev
-
-# 4. Clone just what you're working on
-spark-cli use InternalAPILambda
-
-# 5. Build — everything else fetched from GitHub automatically
-spark-cli build-all
+spark-cli setup        # install Nix, configure GitHub token, pre-warm cache
+spark-cli dev          # enter dev shell (Node 22, Java 17, AWS CLI...)
+spark-cli build-all    # build everything
 ```
 
-## Commands
+## Documentation
 
-### Nix Build System (reproducible builds)
+| Guide | What's in it |
+|-------|-------------|
+| [Getting Started](docs/getting-started.md) | New developer onboarding, prerequisites, setup walkthrough, troubleshooting |
+| [Daily Workflow](docs/daily-workflow.md) | Make changes, build, deploy to beta, create PRs, check CI |
+| [Command Reference](docs/commands.md) | Every command with flags, examples, and real output |
+| [How It Works](docs/how-it-works.md) | Nix internals, flake structure, build derivations, CI integration |
 
-| Command | Description |
-|---------|-------------|
-| `spark-cli setup` | First-time setup: install Nix, configure GitHub token, pre-warm dev shell |
-| `spark-cli dev` | Enter the Nix dev shell (Node 22, Java 17, AWS CLI, Gradle) |
-| `spark-cli build <package>` | Build a specific package (also accepts repo names) |
-| `spark-cli build-all` | Build all packages in dependency order |
-| `spark-cli status` | Show which repos are local 📁 vs fetched from GitHub 🌐 |
-| `spark-cli doctor` | Check Nix environment health (6 checks: Nix, flakes, token, access, repos, npm) |
-
-**Package names:**
-
-| Repo Name | Nix Package |
-|-----------|------------|
-| `InternalModel` | `internal-model` |
-| `InternalAPILambda` | `internal-api-lambda` |
-| `InternalWebsiteClient` | `internal-website-client` |
-| `InternalServiceCDK` | `internal-service-cdk` |
-
-Both forms are accepted: `spark-cli build InternalModel` = `spark-cli build internal-model`
-
-### Workspace Management
-
-| Command | Description |
-|---------|-------------|
-| `spark-cli use <repo>` | Clone a repo into the workspace |
-| `spark-cli workspace` | Show workspace info (repos, AWS profile, branches) |
-| `spark-cli workspace create <path>` | Create a new workspace |
-| `spark-cli workspace configure --profile <name>` | Set default AWS profile |
-| `spark-cli run [script]` | Run a script with workspace env injected |
-| `spark-cli cdk [args...]` | Run AWS CDK CLI in the workspace CDK repo |
-| `spark-cli remove <repo>` | Remove a repo from the workspace manifest |
-| `spark-cli sync` | Sync all repos and refresh `.env` from AWS |
-
-## How the Nix Build System Works
-
-Inspired by Amazon's Brazil build system:
-
-- **Clone only what you're working on.** Other repos are fetched from GitHub automatically at the pinned `flake.lock` version.
-- **`spark-cli dev` gives a guaranteed toolchain.** Node 22, Java 17, AWS CLI — identical on every machine.
-- **Reproducible builds.** Same input always produces the same output, local = CI.
+## Command Groups
 
 ```
-InternalModel (Gradle/Smithy)
-  └── generates TypeScript SDK
-       ├── InternalAPILambda (TypeScript Lambda)
-       ├── InternalWebsiteClient (TypeScript + Vite)
-       └── InternalServiceCDK (AWS CDK)
+Setup & Diagnostics:
+  spark-cli setup       First-time onboarding (idempotent)
+  spark-cli doctor      Health check — run if anything seems broken
+  spark-cli init        Initialise a workspace from scratch
+
+Development:
+  spark-cli dev         Enter the Nix dev shell
+  spark-cli build       Build one package
+  spark-cli build-all   Build all packages
+  spark-cli pr          Push branch + create PR with template
+  spark-cli status      Local repos vs GitHub (pinned)
+
+Workspace:
+  spark-cli use         Clone a repo into the workspace
+  spark-cli remove      Remove a repo
+  spark-cli workspace   Workspace config (profile, env)
+
+Infrastructure:
+  spark-cli cdk         Run CDK (--profile pipeline for deploys)
+  spark-cli run         Run any command with workspace env injected
 ```
 
-## Setup Details
+Run `spark-cli <command> -h` for detailed help on any command.
 
-`spark-cli setup` is idempotent — safe to run multiple times:
+## How It Works (Short Version)
 
-1. Installs Nix via [Determinate Systems installer](https://install.determinate.systems/)
-2. Enables flakes in `~/.config/nix/nix.conf`
-3. Configures GitHub token (auto-reads from `gh auth token` or prompts)
-   - Writes to `~/.config/nix/nix.conf` for private repo access
-   - Writes to `~/.npmrc` for `@spark-rewards` npm packages
-4. Pre-warms the dev shell (downloads toolchain packages, ~3–10 min first time)
+SparkRewards uses a [Brazil-like](https://blog.acolyer.org/2020/03/13/build-and-dev-tools-at-amazon/) sparse checkout model:
 
-```bash
-spark-cli setup             # full setup
-spark-cli setup --skip-cache  # skip pre-warming (faster; first 'spark-cli dev' downloads instead)
-```
+- Clone only the repos you're actively editing
+- Everything else is fetched from GitHub at the pinned `flake.lock` version
+- `spark-cli dev` gives you an identical toolchain on every machine
+- `spark-cli build` = `nix build --impure .#<package>` with output filtering
 
-## Troubleshooting
-
-```bash
-spark-cli doctor    # diagnose any issues
-spark-cli setup     # re-run setup to fix automatically
-```
-
-Run `spark-cli <command> --help` for detailed help on any command.
+See [docs/how-it-works.md](docs/how-it-works.md) for the full explanation.

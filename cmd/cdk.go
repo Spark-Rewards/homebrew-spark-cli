@@ -28,18 +28,33 @@ from the current repo (if it contains cdk.json) or from CorePipeline (or any
 workspace repo that contains cdk.json). Passes all arguments through to cdk.
 
 A --profile / -p flag is available to select an AWS account:
-  pipeline  →  AWS_PROFILE=openclaw-pipeline
-  beta      →  AWS_PROFILE=openclaw-beta
-  prod      →  AWS_PROFILE=openclaw-prod
+  pipeline  →  AWS_PROFILE=openclaw-pipeline  (cross-account deploy role — use this)
+  beta      →  AWS_PROFILE=openclaw-beta       (read-only)
+  prod      →  AWS_PROFILE=openclaw-prod       (READ ONLY — never deploy directly)
 
 AWS_DEFAULT_OUTPUT=json is always injected. Workspace env (GITHUB_TOKEN etc.)
 is also injected so cdk synth can resolve private npm packages.
 
+Deploy workflow (beta):
+  1. spark-cli build-all                             # build all packages
+  2. spark-cli cdk --profile pipeline list           # list available stacks
+  3. spark-cli cdk --profile pipeline diff           # preview changes (always do this first)
+  4. spark-cli cdk --profile pipeline deploy         # deploy to beta via pipeline account
+
+Stack name examples (use 'list' to see all):
+  InternalServiceStack    InternalAPILambda + InternalWebsiteClient
+  BusinessServiceStack    BusinessAPILambda + BusinessWebsite
+  AppServiceStack         AppAPILambda + MobileApp
+  CorePipelineStack       CI/CD pipeline infrastructure
+
+🚨 NEVER deploy directly to prod. Prod is promoted via main branch merge → pipeline.
+
 Examples:
   spark-cli cdk list
-  spark-cli cdk --profile pipeline list
-  spark-cli cdk -p beta deploy PipelineStack/beta/SomeStack
-  spark-cli cdk diff
+  spark-cli cdk --profile pipeline diff
+  spark-cli cdk --profile pipeline deploy InternalServiceStack
+  spark-cli cdk -p pipeline deploy InternalServiceStack --require-approval never
+  spark-cli cdk diff                    # uses workspace default profile
   spark-cli cdk synth`,
 	Args:               cobra.ArbitraryArgs,
 	DisableFlagParsing: true,
@@ -85,9 +100,9 @@ Examples:
 				return fmt.Errorf("unknown profile %q — valid options: pipeline, beta, prod", profileShort)
 			}
 			awsProfileEnvVal = mapped
-		} else if ws.AWSProfile != "" {
-			// Fall back to workspace default
-			awsProfileEnvVal = ws.AWSProfile
+		} else {
+			// CDK repos always need pipeline credentials by default
+			awsProfileEnvVal = "openclaw-pipeline"
 		}
 
 		if awsProfileEnvVal != "" {
@@ -191,5 +206,6 @@ func hasCDK(dir string) bool {
 }
 
 func init() {
+	cdkCmd.GroupID = "infra"
 	rootCmd.AddCommand(cdkCmd)
 }

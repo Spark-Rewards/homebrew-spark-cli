@@ -177,5 +177,6 @@ func checkGitHubAccess() string {
 }
 
 func init() {
+	doctorCmd.GroupID = "setup"
 	rootCmd.AddCommand(doctorCmd)
 }

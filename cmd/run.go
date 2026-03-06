@@ -393,5 +393,6 @@ func ensureGitHubToken(wsEnv map[string]string) map[string]string {
 }
 
 func init() {
+	runCmd.GroupID = "infra"
 	rootCmd.AddCommand(runCmd)
 }

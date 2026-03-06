@@ -187,5 +187,6 @@ Examples:
 
 func init() {
 	initCmd.Flags().Bool("skip-setup", false, "Drop workspace files only, skip Nix install and configuration")
+	initCmd.GroupID = "setup"
 	rootCmd.AddCommand(initCmd)
 }

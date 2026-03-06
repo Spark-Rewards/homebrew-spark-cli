@@ -64,5 +64,6 @@ Example:
 }
 
 func init() {
+	removeCmd.GroupID = "workspace"
 	rootCmd.AddCommand(removeCmd)
 }
