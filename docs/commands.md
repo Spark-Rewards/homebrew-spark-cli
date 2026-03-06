@@ -29,13 +29,11 @@ spark-cli doctor
 ### Building
 
 ```bash
-# Build current repo
+# Build the repo you're currently in
+cd ~/SparkRewards/InternalAPILambda
 spark-cli run build
 
-# Build a specific repo
-spark-cli run build --repo InternalAPILambda
-
-# Build all repos in dependency order
+# Build all repos in dependency order (rarely needed)
 spark-cli build-all
 ```
 
