@@ -68,20 +68,35 @@ spark-cli cdk list
 
 > ⚠️ **Never deploy to prod directly.** Prod deploys happen via PR merge pipeline only.
 
-### Git / Rebasing
+### Syncing / Rebasing
+
+```bash
+# Rebase ALL local repos onto main (parallel fetch + sequential rebase)
+spark-cli workspace sync
+
+# Sync + reinstall deps where package-lock changed
+spark-cli workspace sync --install
+
+# Sync + update all @spark-rewards/* SDKs to latest
+spark-cli workspace sync --update
+
+# Sync a single repo
+spark-cli workspace sync InternalAPILambda
+
+# Sync + refresh .env from beta SSM
+spark-cli workspace sync --env beta
+```
+
+### Creating PRs
 
 ```bash
 # Always work on flame-develop
 git checkout flame-develop
 
-# Rebase on latest main before creating PR
-git fetch origin
-git rebase origin/main
+# Sync first (rebases onto main)
+spark-cli workspace sync
 
-# If conflicts, resolve then:
-git rebase --continue
-
-# Force push after rebase (only on your branch)
+# Force push after rebase
 git push origin flame-develop --force-with-lease
 
 # Create PR
@@ -148,6 +163,9 @@ spark-cli cdk list
 | Clone a repo | `spark-cli use <repo>` |
 | Build | `spark-cli run build` |
 | Test | `spark-cli run test` |
+| Sync all repos | `spark-cli workspace sync` |
+| Sync + install | `spark-cli workspace sync -i` |
+| Sync + update SDKs | `spark-cli workspace sync -u` |
 | Deploy to beta | `spark-cli cdk deploy "Stack"` |
 | Check health | `spark-cli doctor` |
 | Enter dev shell | `spark-cli dev` |
