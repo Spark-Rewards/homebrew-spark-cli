@@ -15,14 +15,14 @@ Instead of each dev installing tools manually (and ending up with different vers
 
 ## Quick Start
 
-### 1. Install Nix
+### 1. Install Everything
 
 ```bash
-# macOS / Linux
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+# spark-cli installs Nix for you — no manual Nix install needed
+spark-cli setup
 ```
 
-Restart your terminal after installation.
+This installs Nix, configures your GitHub token, and warms the cache. Restart your terminal after.
 
 ### 2. Enter the Dev Environment
 
@@ -158,7 +158,7 @@ nix flake lock --update-input nixpkgs
 
 ## Troubleshooting
 
-### "command not found" after installing Nix
+### "command not found" after setup
 
 Restart your terminal. If still broken:
 ```bash
